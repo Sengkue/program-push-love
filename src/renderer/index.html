@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy Files Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .controls {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .controls h3 {
+            color: white;
+            margin-bottom: 15px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .status {
+            color: white;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+
+        .files-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .file-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .file-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+
+        .file-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .file-name {
+            font-weight: 700;
+            color: #333;
+            font-size: 1.1rem;
+        }
+
+        .file-date {
+            color: #666;
+            font-size: 0.9rem;
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 12px;
+        }
+
+        .file-content {
+            color: #444;
+            line-height: 1.6;
+            font-size: 1rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .file-size {
+            color: #888;
+            font-size: 0.8rem;
+            margin-top: 10px;
+            text-align: right;
+        }
+
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.2rem;
+            margin: 50px 0;
+        }
+
+        .error {
+            background: rgba(255, 0, 0, 0.1);
+            color: #ff4757;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+        }
+
+        .empty {
+            text-align: center;
+            color: white;
+            font-size: 1.2rem;
+            margin: 50px 0;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .files-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Happy Files Viewer</h1>
+        
+        <div class="controls">
+            <h3>File Management</h3>
+            <div class="button-group">
+                <button onclick="loadFiles()">Refresh Files</button>
+                <button onclick="triggerNewFile()">Create New File</button>
+                <button onclick="getSystemStatus()">System Status</button>
+                <span class="status" id="status">Ready</span>
+            </div>
+        </div>
+
+        <div id="content">
+            <div class="loading">Click "Refresh Files" to load your happy files...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+        
+        async function loadFiles() {
+            const contentDiv = document.getElementById('content');
+            const statusSpan = document.getElementById('status');
+            
+            statusSpan.textContent = 'Loading files...';
+            contentDiv.innerHTML = '<div class="loading">Loading your happy files...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/happy-files`);
+                const data = await response.json();
+                
+                if (data.success && data.files && data.files.length > 0) {
+                    displayFiles(data.files);
+                    statusSpan.textContent = `Loaded ${data.files.length} files`;
+                } else {
+                    contentDiv.innerHTML = '<div class="empty">No files found in the happy folder yet.</div>';
+                    statusSpan.textContent = 'No files found';
+                }
+            } catch (error) {
+                contentDiv.innerHTML = `<div class="error">Error loading files: ${error.message}</div>`;
+                statusSpan.textContent = 'Error loading files';
+                console.error('Error:', error);
+            }
+        }
+        
+        function displayFiles(files) {
+            const contentDiv = document.getElementById('content');
+            
+            const filesHTML = files.map(file => {
+                const createdDate = new Date(file.created).toLocaleString();
+                const fileSize = formatFileSize(file.size);
+                
+                return `
+                    <div class="file-card fade-in">
+                        <div class="file-header">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-date">${createdDate}</div>
+                        </div>
+                        <div class="file-content">${file.content}</div>
+                        <div class="file-size">${fileSize}</div>
+                    </div>
+                `;
+            }).join('');
+            
+            contentDiv.innerHTML = `<div class="files-grid">${filesHTML}</div>`;
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        async function triggerNewFile() {
+            const statusSpan = document.getElementById('status');
+            
+            statusSpan.textContent = 'Creating new file...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/trigger-minutely`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    statusSpan.textContent = 'New file created successfully!';
+                    // Auto-refresh files after creating
+                    setTimeout(loadFiles, 1000);
+                } else {
+                    statusSpan.textContent = 'Error creating file';
+                }
+            } catch (error) {
+                statusSpan.textContent = 'Error creating file';
+                console.error('Error:', error);
+            }
+        }
+        
+        async function getSystemStatus() {
+            const statusSpan = document.getElementById('status');
+            
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const data = await response.json();
+                
+                if (data.totalActive > 0) {
+                    statusSpan.textContent = `System running - ${data.totalActive} active tasks`;
+                } else {
+                    statusSpan.textContent = 'System idle - no active tasks';
+                }
+            } catch (error) {
+                statusSpan.textContent = 'Cannot connect to system';
+                console.error('Error:', error);
+            }
+        }
+        
+        // Auto-refresh files every 30 seconds
+        setInterval(() => {
+            if (document.getElementById('content').innerHTML.includes('files-grid')) {
+                loadFiles();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
